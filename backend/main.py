@@ -1,10 +1,11 @@
 import logging
 from google.appengine.ext import ndb
+from google.appengine.api import taskqueue
 
 from flask import request, jsonify, Flask
 from flask import render_template, redirect
 
-from secrets import SCALE_CALLBACK_AUTH_KEY
+from secrets import SCALE_CALLBACK_TEST_AUTH_KEY
 
 app = Flask(__name__)
 
@@ -36,13 +37,39 @@ class ComparisonTask(ndb.Model):
 
 @app.route('/callback', methods = ['POST'])
 def callback():
-    # validate the scale auth key attached to the request
+    #
+    # validate that the request has a correct scale authentication key. the
+    # key is sent as a header with name Scale-Callback-Auth
+    #
+    # TODO:
+    #  - how should both test and live keys be handled?
+    #
     scale_auth_key = request.headers.get('Scale-Callback-Auth', None)
-    if not scale_auth_key or scale_auth_key != SCALE_CALLBACK_AUTH_KEY:
-        logging.warning("bad scale auth key \"%s\" expected \"%s\"" % \
-                (scale_auth_key, SCALE_CALLBACK_AUTH_KEY))
+    if not scale_auth_key or scale_auth_key != SCALE_CALLBACK_TEST_AUTH_KEY:
+        logging.warning("invalid scale auth key \"%s\" expected \"%s\"" % \
+                (scale_auth_key, SCALE_CALLBACK_TEST_AUTH_KEY))
         return '', 401
-    return '', 201
+
+    #
+    # validate that the response has our metadata. we check again in the
+    # worker, but want to avoid putting bad requests in the queue, and can
+    # also respond to scale with an error.
+    #
+    # TODO:
+    #  - validate json schema
+    #
+    data = request.get_json()
+    if not data:
+        logging.error("could not decode scale callback data: %s" % \
+                (request.data,))
+        return '', 500
+
+    logging.info(`data`)
+
+    taskqueue.add(url='/callback_worker',
+            payload=request.data, target='worker')
+
+    return '', 200
 
 @app.route('/show/<key>', methods = ['GET'])
 def show_task(key):

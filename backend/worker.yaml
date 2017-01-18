@@ -1,7 +1,7 @@
 runtime: python27
 api_version: 1
 threadsafe: true
-service: default
+service: worker
 
 # satisfy flask deps
 libraries:
@@ -11,8 +11,6 @@ libraries:
   version: latest
 
 handlers:
-- url: /callback
-  script: main.app
 - url: /.*
-  script: main.app
+  script: worker.app
   login: admin
