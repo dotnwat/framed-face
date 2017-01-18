@@ -1,0 +1,10 @@
+<ul>
+<li>created: {{ task.created }}</li>
+<li>updated: {{ task.updated }}</li>
+<li>image urls
+  <ul>
+    {% for url in task.img_urls %}
+      <li>{{ url }}</li>
+    {% endfor %}
+  </ul>
+</li>
