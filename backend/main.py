@@ -36,11 +36,12 @@ class ComparisonTask(ndb.Model):
 
 @app.route('/callback', methods = ['POST'])
 def callback():
+    # validate the scale auth key attached to the request
     scale_auth_key = request.headers.get('Scale-Callback-Auth', None)
     if not scale_auth_key or scale_auth_key != SCALE_CALLBACK_AUTH_KEY:
         logging.warning("bad scale auth key \"%s\" expected \"%s\"" % \
                 (scale_auth_key, SCALE_CALLBACK_AUTH_KEY))
-        return None, 401
+        return '', 401
     return '', 201
 
 @app.route('/show/<key>', methods = ['GET'])
