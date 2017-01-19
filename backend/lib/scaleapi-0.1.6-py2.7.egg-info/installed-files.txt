@@ -1,0 +1,10 @@
+../scaleapi/tasks.py
+../scaleapi/__init__.py
+../scaleapi/tasks.pyc
+../scaleapi/__init__.pyc
+.
+SOURCES.txt
+dependency_links.txt
+top_level.txt
+PKG-INFO
+requires.txt
