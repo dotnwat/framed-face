@@ -9,6 +9,8 @@ libraries:
   version: latest
 - name: markupsafe
   version: latest
+- name: ssl
+  version: latest
 
 handlers:
 - url: /callback

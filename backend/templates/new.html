@@ -3,7 +3,7 @@
 </head>
 <body>
 	<h3>Build A New Task</h3>
-	<form method="post" action='/new'>
+	<form method="post" action='/api/create'>
 		<label for="img0">Image 0:</label>
 		<input type="text" name="img0"><br/>
 		<label for="img1">Image 1:</label>
@@ -25,6 +25,7 @@
 		<label for="img9">Image 9:</label>
 		<input type="text" name="img9"><br/>
 		<br/>
-		<input type="submit">
+		<input type="submit" name="create" value="create"/>
+		<input type="submit" name="create-run" value="create and run"/>
 	</form>
 </body>

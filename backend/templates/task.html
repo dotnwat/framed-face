@@ -1,3 +1,10 @@
+<h1>actions</h1>
+<form method="post" action="/api/run">
+  <input type="hidden" name="key" value="{{ task.key.urlsafe() }}"/>
+  <input type="submit" name="run" value="run"/>
+</form>
+
+<h1>details</h1>
 <ul>
 <li>created: {{ task.created }}</li>
 <li>updated: {{ task.updated }}</li>
@@ -8,3 +15,15 @@
     {% endfor %}
   </ul>
 </li>
+</ul>
+
+<h1>jobs</h1>
+{% if jobs|length == 0 %}
+<i>no jobs found</i>
+{% else %}
+<ul>
+{% for job in jobs %}
+<li>{{ job.key.urlsafe() }}</li>
+{% endfor %}
+</ul>
+{% endif %}

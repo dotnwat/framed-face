@@ -5,7 +5,18 @@ from google.appengine.api import taskqueue
 from flask import request, jsonify, Flask
 from flask import render_template, redirect
 
+#
+# TODO:
+#  - figure out how to enable sockets instead of URLFetch
+#    https://urllib3.readthedocs.io/en/latest/reference/urllib3.contrib.html
+#
+import requests
+from requests_toolbelt.adapters import appengine
+appengine.monkeypatch()
+
 from secrets import SCALE_CALLBACK_TEST_AUTH_KEY
+
+from models import ComparisonInputSet, ComparisonJobInputSet
 
 app = Flask(__name__)
 
@@ -30,10 +41,6 @@ def handle_invalid_usage(error):
     response.status_code = error.status_code
     return response
 
-class ComparisonTask(ndb.Model):
-    created = ndb.DateTimeProperty(auto_now_add=True)
-    updated = ndb.DateTimeProperty(auto_now=True)
-    img_urls = ndb.StringProperty(repeated=True)
 
 @app.route('/callback', methods = ['POST'])
 def callback():
@@ -74,27 +81,72 @@ def callback():
 @app.route('/show/<key>', methods = ['GET'])
 def show_task(key):
     task = ndb.Key(urlsafe=key).get()
-    return render_template('task.html', task=task)
+    jobs = ComparisonJobInputSet.query(ancestor = task.key).fetch()
+    return render_template('task.html', task=task, jobs=jobs)
+#
+# create a copy of a task and schedule processing
+#
+# TODO:
+#  - only the source image urls are copied and we don't handle the case that
+#    the source images are deleted or changed.
+#
+@ndb.transactional
+def schedule_task_run(comparison_input):
+    # create copy of input
+    job_input_set = ComparisonJobInputSet(
+            parent = comparison_input.key,
+            img_urls = comparison_input.img_urls)
+    job_input_key = job_input_set.put()
 
-def create_new_comparison_task(request):
+    # create the comparison job
+    taskqueue.add(url='/create_comparison_job',
+            params={'key': job_input_key.urlsafe()},
+            target='worker',
+            transactional=True)
+
+#
+# transactionally create a comparison task and optionally schedule task
+# processing for the new task.
+#
+@ndb.transactional
+def create_and_run_task(img_urls, schedule_run):
+    task = ComparisonInputSet(img_urls = img_urls)
+    key = task.put()
+    if schedule_run:
+        schedule_task_run(task)
+    return key
+
+#
+# API: run a job
+#
+@app.route('/api/run', methods = ['POST'])
+def run_task_route():
+    key = ndb.Key(urlsafe = request.form['key'])
+    task = key.get()
+    schedule_task_run(task)
+    return redirect('/show/' + key.urlsafe())
+
+#
+# API: create a job, and optionally run it
+#
+@app.route('/api/create', methods = ['POST'])
+def create_task_route():
     img_urls = []
     for key, value in request.form.items():
         if "img" in key and value != '':
             img_urls.append(value)
     if img_urls == []:
         raise InvalidUsage('you must supply images', status_code=410)
-
-    task = ComparisonTask(img_urls = img_urls)
-    key = task.put()
-
+    schedule_run = request.form.has_key('create-run')
+    key = create_and_run_task(img_urls, schedule_run)
     return redirect('/show/' + key.urlsafe())
 
-@app.route('/new', methods = ['GET', 'POST'])
-def new_task():
-    if request.method == 'GET':
-        return render_template('new.html')
-    elif request.method == 'POST':
-        return create_new_comparison_task(request)
+#
+# VIEW: new task form
+#
+@app.route('/new', methods = ['GET'])
+def new_task_route():
+    return render_template('new.html')
 
 @app.errorhandler(500)
 def server_error(e):
