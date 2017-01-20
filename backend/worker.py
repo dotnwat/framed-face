@@ -1,7 +1,7 @@
 import logging
 from itertools import izip
 from google.appengine.ext import ndb
-from google.appengine.ext import deferred
+from google.appengine.api import taskqueue
 
 from flask import request, jsonify, Flask
 from flask import render_template, redirect
@@ -92,6 +92,11 @@ def do_handle_create_task(urlsafe_key):
 
     comparison_job_input.put()
 
+    taskqueue.add(url='/dispatch_comparison_tasks',
+            params={'key': urlsafe_key},
+            target='worker',
+            transactional=True)
+
 #
 # SERVICE: create comparison job
 #
@@ -109,6 +114,46 @@ def do_handle_create_task(urlsafe_key):
 @app.route('/create_comparison_job', methods = ['POST'])
 def handle_create_task():
     do_handle_create_task(request.form['key'])
+    return '', 200
+
+@ndb.transactional
+def dispatch_some_tasks(urlsafe_key):
+    job = ndb.Key(urlsafe = urlsafe_key).get()
+    more_tasks = False
+    tasks_queued = 0
+    for i in range(len(job.tasks)):
+        if job.tasks[i].queued or job.tasks[i].submitted:
+            if job.tasks[i].submitted:
+                logging.warning("trying to dispatch submitted task")
+            continue
+        if job.tasks[i].img0 != None and job.tasks[i].img1 != None:
+            taskqueue.add(url='/submit_comparison_task',
+                    params={'key': urlsafe_key,
+                            'idx': i,
+                            'img0': job.img_urls[job.tasks[i].img0],
+                            'img1': job.img_urls[job.tasks[i].img1]},
+                    target='worker',
+                    transactional=True)
+            job.tasks[i].queued = True
+            tasks_queued += 1
+            if tasks_queued == 5:
+                more_tasks = True
+                break
+            pass
+        pass
+    job.put()
+    return more_tasks
+
+@app.route('/dispatch_comparison_tasks', methods = ['POST'])
+def handle_dispatch_comparison_tasks():
+    urlsafe_key = request.form['key']
+    while dispatch_some_tasks(urlsafe_key):
+        pass
+    return '', 200
+
+@app.route('/submit_comparison_task', methods = ['POST'])
+def handle_submit_comparison_task():
+    logging.info(request.form)
     return '', 200
 
 ## must be a valid url. we don't want to rely on scaleapi here. so we

@@ -11,8 +11,12 @@ class ComparisonInputSet(ndb.Model):
 #
 # imgN: index of the img url in img_urls
 # dep0: index of the dependency task
+# queued: queued creation of human task
+# submitted: sent to human comp resource
 #
 class ComparisonTask(ndb.Model):
+    queued = ndb.BooleanProperty(default=False)
+    submitted = ndb.BooleanProperty(default=False)
     img0 = ndb.IntegerProperty()
     dep0 = ndb.IntegerProperty()
     img1 = ndb.IntegerProperty()
