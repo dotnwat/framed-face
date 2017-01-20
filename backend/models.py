@@ -9,6 +9,16 @@ class ComparisonInputSet(ndb.Model):
     img_urls = ndb.StringProperty(repeated=True)
 
 #
+# imgN: index of the img url in img_urls
+# dep0: index of the dependency task
+#
+class ComparisonTask(ndb.Model):
+    img0 = ndb.IntegerProperty()
+    dep0 = ndb.IntegerProperty()
+    img1 = ndb.IntegerProperty()
+    dep1 = ndb.IntegerProperty()
+
+#
 # ComparisonJobInputSet - a set of comparison items that are used as input to a
 # job. in general this data is read-only, but might contain job-specific
 # metdata.
@@ -17,3 +27,4 @@ class ComparisonJobInputSet(ndb.Model):
     created = ndb.DateTimeProperty(auto_now_add=True)
     updated = ndb.DateTimeProperty(auto_now=True)
     img_urls = ndb.StringProperty(repeated=True)
+    tasks = ndb.LocalStructuredProperty(ComparisonTask, repeated=True)

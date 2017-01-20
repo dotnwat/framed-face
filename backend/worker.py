@@ -1,13 +1,41 @@
 import logging
+from itertools import izip
 from google.appengine.ext import ndb
 from google.appengine.ext import deferred
 
 from flask import request, jsonify, Flask
 from flask import render_template, redirect
 
-from models import ComparisonInputSet, ComparisonJobInputSet
+from models import ComparisonInputSet, ComparisonJobInputSet, ComparisonTask
 
 app = Flask(__name__)
+
+class InvalidUsage(Exception):
+    status_code = 400
+
+    def __init__(self, message, status_code=None, payload=None):
+        Exception.__init__(self)
+        self.message = message
+        if status_code is not None:
+            self.status_code = status_code
+        self.payload = payload
+
+    def to_dict(self):
+        rv = dict(self.payload or ())
+        rv['message'] = self.message
+        return rv
+
+@app.errorhandler(InvalidUsage)
+def handle_invalid_usage(error):
+    response = jsonify(error.to_dict())
+    response.status_code = error.status_code
+    return response
+
+def grouped(iterable):
+    groups = list(izip(*[iter(iterable)]*2))
+    if len(iterable) % 2 == 0:
+        return groups, None
+    return groups, list(iterable)[-1]
 
 #
 # TODO: queueing work from the scaleapi callback keeps latency low and
@@ -21,6 +49,48 @@ app = Flask(__name__)
 def callback_worker():
     logging.info(request.data)
     return '', 200
+
+#
+#
+#
+@ndb.transactional
+def do_handle_create_task(urlsafe_key):
+    # retrieve the comparison input
+    comparison_job_input_key = ndb.Key(urlsafe = urlsafe_key)
+    comparison_job_input = comparison_job_input_key.get()
+
+    # todo:
+    # - check return codes
+    # - eliminate duplicates (model validator)
+    # - use model validator for img urls length?
+    img_urls = comparison_job_input.img_urls
+    if len(img_urls) < 2:
+        raise InvalidUsage('img urls too small', 410)
+    if len(comparison_job_input.tasks) > 0:
+        raise InvalidUsage('tasks should be empty', 410)
+
+    # generate tasks. tasks may have dependencies on other tasks which are
+    # represented by an index into the array of tasks. it would be good to
+    # represent parent pointers so that we don't need to scan the data
+    # structure when an update is made (to find those that depend on the
+    # updated task). for small jobs this will work just fine.
+    prev_task = None
+    groups, extra = grouped(range(len(img_urls)))
+    for url0, url1 in groups:
+        task = ComparisonTask(img0=url0, img1=url1)
+        comparison_job_input.tasks.append(task)
+        if prev_task is None:
+            prev_task = len(comparison_job_input.tasks) - 1
+            continue
+        task = ComparisonTask(dep0=prev_task,
+                dep1 = len(comparison_job_input.tasks) - 1)
+        comparison_job_input.tasks.append(task)
+        prev_task = len(comparison_job_input.tasks) - 1
+    if extra:
+        task = ComparisonTask(dep0=prev_task, img1=extra)
+        comparison_job_input.tasks.append(task)
+
+    comparison_job_input.put()
 
 #
 # SERVICE: create comparison job
@@ -38,13 +108,7 @@ def callback_worker():
 #
 @app.route('/create_comparison_job', methods = ['POST'])
 def handle_create_task():
-    # retrieve the comparison input
-    comparison_job_input_key = ndb.Key(urlsafe = request.form['key'])
-    comparison_job_input = comparison_job_input_key.get()
-
-    # generate bracket
-    logging.info(comparison_job_input_key.urlsafe())
-
+    do_handle_create_task(request.form['key'])
     return '', 200
 
 ## must be a valid url. we don't want to rely on scaleapi here. so we

@@ -135,8 +135,8 @@ def create_task_route():
     for key, value in request.form.items():
         if "img" in key and value != '':
             img_urls.append(value)
-    if img_urls == []:
-        raise InvalidUsage('you must supply images', status_code=410)
+    if len(img_urls) < 2:
+        raise InvalidUsage('two or more images are required', status_code=410)
     schedule_run = request.form.has_key('create-run')
     key = create_and_run_task(img_urls, schedule_run)
     return redirect('/show/' + key.urlsafe())
