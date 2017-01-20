@@ -81,7 +81,9 @@ def callback():
 @app.route('/show/<key>', methods = ['GET'])
 def show_task(key):
     task = ndb.Key(urlsafe=key).get()
-    jobs = ComparisonJobInputSet.query(ancestor = task.key).fetch()
+    jobs = ComparisonJobInputSet.query(ancestor = task.key) \
+                                .order(-ComparisonJobInputSet.created) \
+                                .fetch()
     return render_template('task.html', task=task, jobs=jobs)
 #
 # create a copy of a task and schedule processing
