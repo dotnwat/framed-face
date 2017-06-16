@@ -26,6 +26,7 @@
 {% for task in job.tasks %}
 <h3>job task {{ loop.index }}</h3>
 <ul>
+<li>best: {{ task.choice }} </li>
 <li>img0: {{ task.img0 }}</li>
 <li>dep0: {{ task.dep0 }}</li>
 <li>img1: {{ task.img1 }}</li>

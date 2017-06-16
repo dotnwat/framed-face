@@ -1,3 +1,5 @@
+import os
+import random
 import logging
 from itertools import izip
 from google.appengine.ext import ndb
@@ -7,6 +9,8 @@ from flask import request, jsonify, Flask
 from flask import render_template, redirect
 
 from models import ComparisonInputSet, ComparisonJobInputSet, ComparisonTask
+
+PRODUCTION = os.getenv('SERVER_SOFTWARE', '').startswith('Google App Engine/')
 
 app = Flask(__name__)
 
@@ -47,7 +51,17 @@ def grouped(iterable):
 #
 @app.route('/callback_worker', methods = ['POST'])
 def callback_worker():
-    logging.info(request.data)
+    job = ndb.Key(urlsafe=request.form['key']).get()
+    idx = int(request.form['idx'])
+    choice = request.form['choice']
+    if choice == "Image 1":
+        job.tasks[idx].choice = 0
+    elif choice == "Image 2":
+        job.tasks[idx].choice = 1
+    else:
+        job.tasks[idx].choice = -1
+        logging.warning("unexpected choice")
+    job.put()
     return '', 200
 
 #
@@ -153,7 +167,19 @@ def handle_dispatch_comparison_tasks():
 
 @app.route('/submit_comparison_task', methods = ['POST'])
 def handle_submit_comparison_task():
-    logging.info(request.form)
+    params = {
+        'key': request.form['key'],
+        'idx': int(request.form['idx']),
+    }
+
+    if PRODUCTION:
+        pass
+    else:
+        params['request'] = ''
+        params['choice'] = random.choice(['Image 1', 'Image 2'])
+        taskqueue.add(url='/callback_worker',
+                params=params,
+                target='worker')
     return '', 200
 
 ## must be a valid url. we don't want to rely on scaleapi here. so we

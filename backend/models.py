@@ -17,6 +17,7 @@ class ComparisonInputSet(ndb.Model):
 class ComparisonTask(ndb.Model):
     queued = ndb.BooleanProperty(default=False)
     submitted = ndb.BooleanProperty(default=False)
+    choice = ndb.IntegerProperty()
     img0 = ndb.IntegerProperty()
     dep0 = ndb.IntegerProperty()
     img1 = ndb.IntegerProperty()

@@ -71,10 +71,15 @@ def callback():
                 (request.data,))
         return '', 500
 
-    logging.info(`data`)
+    params = {
+        'choice': data['task']['response']['choice'],
+        'key': 'asdf',
+        'idx': 1,
+        'request': request.data,
+    }
 
     taskqueue.add(url='/callback_worker',
-            payload=request.data, target='worker')
+            params=params, target='worker')
 
     return '', 200
 
